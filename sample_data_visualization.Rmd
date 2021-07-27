@@ -1,0 +1,122 @@
+---
+title: "Sample Chatroom Data Visualization"
+author: "Adrienne Wood"
+date: "4/30/2021"
+output: html_document
+---
+```{r setup, include=FALSE, cache = FALSE}
+pacman::p_load(tidyverse,knitr)## setting working directory
+opts_knit$set(root.dir = "~/Library/Mobile Documents/com~apple~CloudDocs/Graduate School/ExplorationChatroom/experimentData/chatData")
+```
+
+```{r libraries}
+library(pacman)
+p_load(igraph,visNetwork,ggplot2,network,tidyverse)
+```
+
+# Graph DTW synchrony scores by group
+```{r static,message=F,warning=F}
+
+palette(hcl.colors(100, "viridis"))
+dLong <-read.csv("finalExplorationChatData.csv")
+dAll <-aggregate(dLong,by=list("Channel.Identifier"=dLong$Channel.Identifier,"Dyad"=dLong$ID),FUN=length)
+dAll <-dAll[,c("Channel.Identifier","Dyad","Message","SubID")]
+dAll <-separate(dAll,col=Dyad,into=c("Ego","Alter"),sep="_")
+minmessage <-min(dAll$Message,na.rm=T)
+sdmessage <-sd(dAll$Message,na.rm=T)
+meanmessage <-mean(dAll$Message,na.rm=T)
+
+
+#this function scales our DTW weights for graphing
+scaleWeight <- function(v,a,b){ 
+  v <- v-min(v)
+  v <- v/max(v)
+  v <- v*(b-a)
+  v+a
+}
+
+for(group in unique(dAll$Channel.Identifier)){
+  messageDF <-dAll[dAll$Channel.Identifier==group,c("Ego","Alter","Message")]
+  names(messageDF) <-c("Ego","Alter","weight")
+  net <-graph_from_data_frame(messageDF,directed=F)
+  # scale nodes by centrality
+  nodesize_strength = scaleWeight(strength(net), 10, 40)
+  # weight and color by message score
+  E(net)$width <- (E(net)$weight-minmessage+1)/2
+  E(net)$color <- as.color(E(net)$weight-minmessage+1,opacity=.8)
+  density <- (edge_density(net))
+  eigen_centrality(net)
+  ggsave(paste("message_graph_",group,".png",sep=""),
+          plot(net,layout=layout_in_circle(net),
+       vertex.size = nodesize_strength,
+       #vertex.label = NA,
+       #edge.color=scaleWeight(E(net)$width,0,5),
+       edge.curved = .2,background="White"
+        ),
+    bg="White")
+}
+
+
+#For each group there is going to be one person that scores 1
+#str(net)
+```
+![1](message_graph_GSL_G.200_main_1.png)
+
+![2](message_graph_GSL_G.13_main_1.png)
+#Number of Conversations partners per Ego.
+```{r}
+dAll <- dAll %>%  filter(Channel.Identifier != "GSL_G.9_main_1")
+explorePartner1 = dAll %>% group_by(Ego) %>% count()
+explorePartner2 = dAll %>% group_by(Alter) %>% count()
+names(explorePartner1) = c("Participant","totalEgo")
+names(explorePartner2) = c("Participant","totalAlter")
+
+explorePartner3 = merge(explorePartner1,explorePartner2, by = "Participant", all = TRUE)
+explorePartner3[is.na(explorePartner3)] = 0
+
+explorePartner4 = explorePartner3 %>% mutate(totalPartners = totalAlter + totalEgo)
+
+
+
+dLong2 <-read.csv("finalExploitationChatData.csv")
+dAll2 <-aggregate(dLong2,by=list("Channel.Identifier"=dLong2$Channel.Identifier,"Dyad"=dLong2$ID),FUN=length)
+dAll2 <-dAll2[,c("Channel.Identifier","Dyad","Message","SubID")]
+dAll2 <-separate(dAll2,col=Dyad,into=c("Ego","Alter"),sep="_")
+dAll2 <- dAll2 %>%  filter(!Channel.Identifier %in% c("GSL_G.200_main_1","GSL_G.13_main_1"))
+
+
+
+exploitPartner1 = dAll2 %>% group_by(Ego) %>% count()
+exploitPartner2 = dAll2 %>% group_by(Alter) %>% count()
+names(exploitPartner1) = c("Participant","totalEgo")
+names(exploitPartner2) = c("Participant","totalAlter")
+
+exploitPartner3 = merge(exploitPartner1,exploitPartner2, by = "Participant", all = TRUE)
+exploitPartner3[is.na(exploitPartner3)] = 0
+exploitPartner4 = exploitPartner3 %>% mutate(totalPartners = totalAlter + totalEgo)
+
+range(exploitPartner4$totalPartners)
+exploitPartner4$Group = "Exploit"
+explorePartner4$Group = "Explore"
+
+fullPartner = rbind(explorePartner4,exploitPartner4)
+
+boxplot(totalPartners ~ Group, data = fullPartner)
+t.test(totalPartners ~ Group, data = fullPartner, var.equal = TRUE)
+
+fullPartner %>% group_by(Group) %>% summarise_at(vars(totalPartners,totalAlter,totalEgo), funs(mean, sd))
+?summarize_at
+
+```
+##DensityPlots
+```{r}
+
+a = prePostMerged %>% select(Group, Density, NetworkGroup) %>% group_by(Group) %>% distinct()
+
+t.test(Density ~ Group, a)
+
+f <- ggplot(a, aes(Group, Density, group = Group))
+
+f + geom_boxplot(col = rainbow(2)) + theme_dark()
+
+```
