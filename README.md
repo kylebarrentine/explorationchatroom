@@ -1,5 +1,5 @@
 # exploration chatroom
-R code and output for planned and actual analyses for preregistered study, [OSF project and preregistration information here](https://osf.io/j25ut/): 
+R code and output for planned and actual analyses, OSF project information here](https://osf.io/j25ut/): 
 
 **Title**: Pilot Exploration Chatroom Study
 **Contributors**: Kyle Barrentine & Adrienne Wood
